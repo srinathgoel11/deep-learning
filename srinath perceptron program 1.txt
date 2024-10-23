@@ -1,0 +1,72 @@
+import numpy as np
+
+class Gates:
+    def __init__(self, not_weight=np.array([1]), 
+                 and_weight=np.array([-1, 1]),
+                 or_weight=np.array([1, -4]), 
+                 or_biase=1, 
+                 and_biase=-7, 
+                 not_biase=0.1,
+                 initial_learning_rate=0.1) -> None:
+        self.not_weight = not_weight
+        self.and_weight = and_weight
+        self.or_weight = or_weight
+        self.or_biase = or_biase
+        self.and_biase = and_biase
+        self.not_biase = not_biase
+        self.learning_rate = initial_learning_rate
+
+    def activation(self, x):
+        return 1 if x >= 0 else 0
+    
+    def perceptron(self, x, w, b):
+        res = np.dot(x, w) + b
+        return self.activation(res)
+    
+    def NOT_function(self, x):
+        x = np.array(x)
+        return self.perceptron(x, self.not_weight, self.not_biase)
+    
+    def AND_function(self, x):
+        x = np.array(x)
+        return self.perceptron(x, self.and_weight, self.and_biase)
+    
+    def OR_function(self, x):
+        x = np.array(x)
+        return self.perceptron(x, self.or_weight, self.or_biase)
+    
+    def XOR_function(self, x):
+        x = np.array(x)
+        y0 = self.NOT_function(x[0])
+        y1 = self.NOT_function(x[1])
+        z1 = self.AND_function([y0, x[1]])
+        z2 = self.AND_function([y1, x[0]])
+        return self.OR_function([z1, z2])
+    
+    def NXOR_function(self, x):
+        return self.NOT_function(self.XOR_function(x))
+    
+    def update_weight(self, inp, out, tar, weight):
+        # Adjust the learning rate based on performance
+        adaptive_lr = self.learning_rate * (1.1 if out != tar else 1.0)
+        # Update weights
+        return weight + adaptive_lr * (tar - out) * inp
+
+    def update_weights(self, func, inp, tar, weight, bias):
+        for i in range(len(inp)):
+            out = func(inp[i])
+            if tar[i] != out:
+                weight = self.update_weight(inp[i], out, tar[i], weight)
+                bias += 0.1 * (tar[i] - out)  # Keep some bias update if needed
+                print(f"Updated weights: {weight}, Updated bias: {bias}")
+                return self.update_weights(func, inp, tar, weight, bias)  # Restart loop if there's an update
+        return weight, bias
+
+    def train(self):
+        self.not_weight, self.not_biase = self.update_weights(self.NOT_function, np.array([1, 0]), np.array([0, 1]), self.not_weight, self.not_biase)
+        self.and_weight, self.and_biase = self.update_weights(self.AND_function, np.array([(0, 0), (1, 0), (0, 1), (1, 1)]), np.array([0, 0, 0, 1]), self.and_weight, self.and_biase)
+        self.or_weight, self.or_biase = self.update_weights(self.OR_function, np.array([(0, 0), (1, 0), (0, 1), (1, 1)]), np.array([0, 1, 1, 1]), self.or_weight, self.or_biase)
+
+# Example usage
+gates = Gates()
+gates.train()
