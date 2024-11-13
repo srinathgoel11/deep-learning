@@ -1,0 +1,63 @@
+import tensorflow as tf
+from tensorflow.keras import layers, models, optimizers
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Generate random data
+def create_data():
+    X = np.random.randn(1000, 10)
+    y = np.random.randn(1000, 1)
+    return X, y
+
+# Create a simple feedforward model
+def create_model():
+    model = models.Sequential([
+        layers.Dense(50, activation='relu', input_shape=(10,)),
+        layers.Dense(20, activation='relu'),
+        layers.Dense(1)
+    ])
+    return model
+
+# Train the model with a given optimizer and return loss history
+def train_model(model, optimizer, X, y, batch_size, epochs, optimizer_name):
+    model.compile(optimizer=optimizer, loss='mean_squared_error')
+    history = []
+
+    for epoch in range(epochs):
+        # Train the model for 1 epoch
+        hist = model.fit(X, y, batch_size=batch_size, epochs=1, verbose=0)
+        loss = hist.history['loss'][0]
+        history.append(loss)
+        print(f"Epoch {epoch+1}/{epochs} - {optimizer_name} Loss: {loss:.4f}")
+
+    return history
+
+# Create random data
+X, y = create_data()
+
+# Set up optimizers
+optimizer_sgd = optimizers.SGD(learning_rate=0.01)
+optimizer_adam = optimizers.Adam(learning_rate=0.001)
+
+# Hyperparameters
+epochs = 50
+batch_size = 32
+
+# Create and train models for both optimizers
+print("\nTraining with SGD Optimizer:")
+model_sgd = create_model()  # Reset the model for a fresh start
+sgd_loss = train_model(model_sgd, optimizer_sgd, X, y, batch_size, epochs, 'SGD')
+
+print("\nTraining with Adam Optimizer:")
+model_adam = create_model()  # Reset the model for a fresh start
+adam_loss = train_model(model_adam, optimizer_adam, X, y, batch_size, epochs, 'Adam')
+
+# Plot the loss curves for comparison
+plt.plot(range(1, epochs+1), sgd_loss, label='SGD', color='blue')
+plt.plot(range(1, epochs+1), adam_loss, label='Adam', color='orange')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('SGD vs Adam Optimizer: Loss Comparison')
+plt.legend()
+plt.grid(True)
+plt.show()
