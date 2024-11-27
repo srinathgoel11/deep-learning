@@ -1,0 +1,89 @@
+import torch
+import torchvision
+from torchvision.transforms import functional as F
+import cv2
+import numpy as np
+from google.colab.patches import cv2_imshow
+from google.colab import files
+
+# Load the pre-trained Faster R-CNN model
+model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
+model.eval()
+
+# Define COCO object categories
+COCO_INSTANCE_CATEGORY_NAMES = [
+    '__background__', 'person', 'bicycle', 'car', 'motorcycle',
+    'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench',
+    'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
+    'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove',
+    'skateboard', 'surfboard', 'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana',
+    'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant',
+    'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 
+    'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase','lion', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+]
+
+# Function to upload an image (supporting multiple files)
+def upload_images():
+    uploaded = files.upload()
+    return [fn for fn in uploaded.keys()]
+
+# Function to perform object detection
+def detect_objects(image_path, confidence_threshold=0.5):
+    img = cv2.imread(image_path)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img_tensor = F.to_tensor(img_rgb).unsqueeze(0)
+    
+    with torch.no_grad():
+        predictions = model(img_tensor)
+    
+    filtered_predictions = []
+    for i in range(len(predictions[0]['boxes'])):
+        label_index = int(predictions[0]['labels'][i])
+        # Ensure the label index is within the valid range
+        label_index = min(label_index, len(COCO_INSTANCE_CATEGORY_NAMES) - 1)
+        if predictions[0]['scores'][i] >= confidence_threshold:  # Dynamic confidence threshold
+            filtered_predictions.append({
+                'box': predictions[0]['boxes'][i].tolist(),
+                'label': COCO_INSTANCE_CATEGORY_NAMES[label_index],
+                'score': predictions[0]['scores'][i].item(),
+                'area': (predictions[0]['boxes'][i][2] - predictions[0]['boxes'][i][0]) *
+                        (predictions[0]['boxes'][i][3] - predictions[0]['boxes'][i][1])  # Area of the box
+            })
+    
+    return filtered_predictions
+
+# Function to save and display results
+def display_and_save_results(image_path, detections):
+    img = cv2.imread(image_path)
+    for detection in detections:
+        print(f"Detected {detection['label']} with confidence {detection['score']:.2f} "
+              f"and area {detection['area']:.2f} at {detection['box']}")
+        x1, y1, x2, y2 = map(int, detection['box'])
+        cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(img, detection['label'], (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+    
+    # Save the result to a new file
+    output_path = f"detected_{image_path.split('/')[-1]}"
+    cv2.imwrite(output_path, img)
+    print(f"Result saved as {output_path}")
+    
+    # Display the image in the notebook
+    cv2_imshow(img)
+    
+    # Return the output path for downloading
+    return output_path
+
+# Upload images
+image_paths = upload_images()
+
+# Ask the user for a confidence threshold (default is 0.5)
+confidence_threshold = float(input("Enter the confidence threshold (default 0.5): ") or 0.5)
+
+# Perform object detection on each uploaded image
+for image_path in image_paths:
+    detections = detect_objects(image_path, confidence_threshold)
+    # Display results and save the annotated image
+    output_image_path = display_and_save_results(image_path, detections)
+
+    # Allow the user to download the result
+    files.download(output_image_path)
